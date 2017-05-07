@@ -4,6 +4,7 @@ import logging
 import requests
 
 import telebot
+from telebot.types import ReplyKeyboardRemove
 from wand.image import Image
 from wand.exceptions import WandException
 from mongoengine import connect
@@ -79,7 +80,8 @@ def choose_template(session, message):
     else:
         session.edit_template(query.get())
         session.save()
-        bot.reply_to(message, 'You can have fun now!')
+        bot.reply_to(message, 'You can have fun now!',
+                     reply_markup=ReplyKeyboardRemove(selective=True))
         send_image(message, session.meme.make_preview())
 
 @bot.message_handler(commands=['set'])
@@ -89,15 +91,17 @@ def set_caption(session, message):
     if len(argv) < 2:
         return bot.reply_to(message, messages.SET_USAGE)
     
-    n = int(argv[1])
+    n = int(argv[1]) - 1
     text = argv[2]
+    if not 0 <= n <= len(session.meme.captions):
+        return bot.reply_to(message, "Хакер, уходи!")
     session.meme.captions[n].text = text
     session.save()
     send_image(message, session.meme.make_preview())
 
 @bot.message_handler(commands=['make'])
 @with_session(Session.EDITING_STATE)
-def send_welcome(session, message):
+def make_meme(session, message):
     send_image(message, session.meme.make_meme())
 
 #@bot.message_handler(content_types=['photo'])
