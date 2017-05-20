@@ -6,7 +6,8 @@ from wand.color import Color
 from wand.drawing import Drawing
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 
-from meme import Meme
+from makememebot.meme import Meme, Caption, FontConfig
+from config import FONTS, DEFAULT_FONT
 
 class MemeTemplate(Document):
     name = StringField(required=True, unique=True)
@@ -33,14 +34,38 @@ class Session(Document):
         ]
     )
     meme = EmbeddedDocumentField(Meme)
+    font_name = StringField(required=True, default=DEFAULT_FONT)
+    font_size = LongField(required=True, default=30, min_value=0)
+    font_color = StringField(required=True, default='white')
+    outline_color = StringField(required=True, default='black')
 
     @classmethod
     def get_session(cls, message):
         return cls.objects(chat_id=message.chat.id).get()
 
-    def set_editing_custom(self, blob):
-        pass
+    def set_editing_custom(self, image):
+        w, h = image.width, image.height
+        captions = [
+            Caption(round(0.05 * w), round(0.02 * h), 
+                    round(0.9 * w), round(0.15 * h)),
+            Caption(round(0.05 * w), round(0.83 * h), 
+                    round(0.9 * w), round(0.15 * h)),
+        ]
+        self.meme = Meme(image.make_blob(), captions)
+        self.state = Session.EDITING_STATE
 
     def edit_template(self, template):
         self.meme = template.meme
         self.state = Session.EDITING_STATE
+
+    def make_meme(self):
+        with self.meme.make_meme(self.get_font_config()) as img:
+            return img.make_blob()
+
+    def make_preview(self):
+        with self.meme.make_preview(self.get_font_config()) as img:
+            return img.make_blob()
+
+    def get_font_config(self):
+        return FontConfig(FONTS[self.font_name], self.font_size,
+                          self.font_color, self.outline_color)
